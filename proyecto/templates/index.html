@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>.:: Modelo de Predicción - Cáncer de Pulmón::.</title>
+
+    <style>
+        :root{
+            --bg:#f6f8fb;
+            --card:#ffffff;
+            --muted:#6b7280;
+            --primary:#2563eb;
+            --accent:#06b6d4;
+            --radius:12px;
+            --max-width:1100px;
+        }
+        *{box-sizing:border-box;font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+        body{margin:0;background:linear-gradient(180deg,#f6f8fb 0%,#ffffff 100%);color:#0f172a;line-height:1.45;padding:32px;display:flex;justify-content:center;}
+        .container{width:100%;max-width:var(--max-width);}
+
+        header.app-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+        header .title{display:flex;flex-direction:column;}
+        header h1{margin:0;font-size:1.25rem;font-weight:700;}
+        header p{margin:4px 0 0;color:var(--muted);font-size:0.95rem;}
+
+        /* Card */
+        .card{background:var(--card);border-radius:var(--radius);box-shadow:0 6px 20px rgba(15,23,42,0.06);padding:20px;margin-bottom:18px;}
+        .form-top{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+        .btn-primary{background:var(--primary);color:#fff;padding:10px 16px;border-radius:8px;border:0;cursor:pointer;font-weight:600;}
+        .btn-primary:hover{filter:brightness(.95);}
+
+        .grid{display:grid;grid-template-columns:1fr 340px;gap:18px;}
+        @media (max-width:920px){.grid{grid-template-columns:1fr;}}
+
+        .metrics-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px;}
+        @media (max-width:920px){.metrics-grid{grid-template-columns:1fr;}}
+
+        .metric{padding:12px;border-radius:10px;background:linear-gradient(180deg,#fff,#fbfdff);border:1px solid rgba(15,23,42,0.04);}
+        .metric h4{margin:0 0 6px 0;font-size:0.95rem;}
+        .metric p{margin:0;color:var(--muted);font-size:0.9rem;}
+
+        .confusion{background:#0f172a10;padding:10px;border-radius:8px;font-family:monospace;font-size:0.95rem;white-space:pre-wrap;}
+
+        .result-table{width:100%;border-collapse:collapse;margin-top:10px;}
+        .result-table th{text-align:left;color:var(--muted);font-weight:600;padding:8px;}
+        .result-table td{padding:8px;background:#fbfdff;border-radius:6px;}
+
+        /* Chart container */
+        .chart-card{height:340px;padding:12px;display:flex;flex-direction:column;justify-content:stretch;}
+        #container{flex:1;min-height:220px;}
+
+        img.heatmap{max-width:100%;height:auto;border-radius:8px;border:1px solid rgba(15,23,42,0.04);display:block;margin-top:8px;}
+
+        footer{margin-top:8px;color:var(--muted);font-size:0.85rem;text-align:center;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="app-header">
+            <div class="title">
+                <h1>Modelo de Predicción - Cáncer de Pulmón</h1>
+                <p>Resultados y visualizaciones del entrenamiento</p>
+            </div>
+            <div>
+                <form action="/prediccion/" method="post" style="display:flex;gap:8px;align-items:center;">
+                    {% csrf_token %}
+                    <button class="btn-primary" type="submit">Predecir</button>
+                </form>
+            </div>
+        </header>
+
+        <main>
+            {% if error %}
+            <div class="card" style="background:#fee;border:1px solid #fcc;">
+                <h3 style="color:#c00;margin:0 0 8px 0;">Error</h3>
+                <p style="margin:0;">{{ error }}</p>
+            </div>
+            {% endif %}
+
+            {% if not test and not error %}
+            <div class="card" style="background:#ffe;border:1px solid #ffc;">
+                <h3 style="color:#880;margin:0 0 8px 0;">Información</h3>
+                <p style="margin:0;">Haz clic en "Predecir" para ejecutar el modelo y ver los resultados.</p>
+            </div>
+            {% endif %}
+
+            <section class="card">
+                <h2 style="margin:0 0 12px 0;">1. Análisis EDA O Exploratorio de datos</h2>
+                <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:220px;">
+                        <h3 style="margin:0 0 8px 0;font-size:1rem;">Correlación</h3>
+                        <img class="heatmap" src="data:image/png;base64,{{ correlation_heatmap }}" alt="Heatmap de correlación" />
+                    </div>
+                    <div style="width:260px;">
+                        <h3 style="margin:0 0 8px 0;font-size:1rem;">Resumen rápido</h3>
+                        <p style="margin:0;color:var(--muted);font-size:0.95rem;">Explora las métricas de los modelos abajo. Usa el botón "Predecir" para obtener nuevas predicciones.</p>
+                    </div>
+                </div>
+            </section>
+
+            <div class="grid">
+                <section class="card">
+                    <h2 style="margin-top:0;">2. Resultados del Modelo: Regresion Logistica</h2>
+                    <div class="metrics-grid">
+                        <div class="metric">
+                            <h4>Precisión</h4>
+                            <p>{{ log_metrics.precision }}</p>
+                        </div>
+                        <div class="metric">
+                            <h4>Recall</h4>
+                            <p>{{ log_metrics.recall }}</p>
+                        </div>
+                        <div class="metric">
+                            <h4>F1 Score</h4>
+                            <p>{{ log_metrics.f1_score }}</p>
+                        </div>
+                    </div>
+
+                    <h2 style="margin:18px 0 8px 0;">3. Resultados de la Red Neuronal</h2>
+
+                    <h4 style="margin:8px 0;">MLP sin optimización</h4>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                        <div style="flex:1;min-width:160px;">
+                            <div class="metric"><h4>Precisión</h4><p>{{ mlp_metrics.precision }}</p></div>
+                        </div>
+                        <div style="flex:1;min-width:160px;">
+                            <div class="metric"><h4>Recall</h4><p>{{ mlp_metrics.recall }}</p></div>
+                        </div>
+                        <div style="flex:1;min-width:160px;">
+                            <div class="metric"><h4>F1 Score</h4><p>{{ mlp_metrics.f1_score }}</p></div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:10px;">
+                        <h5 style="margin:8px 0 6px 0;">Matriz de Confusión</h5>
+                        <div class="confusion">
+                            {% for row in mlp_metrics.confusion_matrix %}
+{{ row }}
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <h4 style="margin:14px 0 8px 0;">MLP con GridSearchCV</h4>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                        <div style="flex:1;min-width:160px;">
+                            <div class="metric"><h4>Precisión</h4><p>{{ mlp_optimized_metrics.precision }}</p></div>
+                        </div>
+                        <div style="flex:1;min-width:160px;">
+                            <div class="metric"><h4>Recall</h4><p>{{ mlp_optimized_metrics.recall }}</p></div>
+                        </div>
+                        <div style="flex:1;min-width:160px;">
+                            <div class="metric"><h4>F1 Score</h4><p>{{ mlp_optimized_metrics.f1_score }}</p></div>
+                        </div>
+                    </div>
+                    <div style="margin-top:10px;">
+                        <h5 style="margin:8px 0 6px 0;">Matriz de Confusión</h5>
+                        <div class="confusion">
+                            {% for row in mlp_optimized_metrics.confusion_matrix %}
+{{ row }}
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <table class="result-table" style="margin-top:14px;">
+                        <thead>
+                            <tr>
+                                <th>Valor Real:</th>
+                                <td>{{ test }}</td>
+                            </tr>
+                            <tr>
+                                <th>Valor Predicción:</th>
+                                <td>{{ prediction }}</td>
+                            </tr>
+                        </thead>
+                    </table>
+                </section>
+
+                <aside class="card chart-card">
+                    <h3 style="margin:0 0 8px 0;">Visualización: Valores reales VS Predicción</h3>
+                    <p style="margin:0 0 8px 0;color:var(--muted);font-size:0.95rem;">Fuente: LUNG_CANCER</p>
+
+                    <!-- Gráfica highcharts-->
+                    <div id="container"></div>
+
+                    <script src="https://code.highcharts.com/highcharts.js"></script>
+                    <script src="https://code.highcharts.com/modules/series-label.js"></script>
+                    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+                    <script src="https://code.highcharts.com/modules/export-data.js"></script>
+                    <script src="https://code.highcharts.com/modules/accessibility.js"></script>
+
+                    <script type="text/javascript">
+                        (function() {
+                            var testData = {{ test|safe }};
+                            var predictionData = {{ prediction|safe }};
+                            
+                            if (typeof Highcharts !== 'undefined') {
+                                Highcharts.chart('container', {
+                                    "title": { 
+                                        "text": "Valores reales VS Predicción" 
+                                    },
+                                    "subtitle": { 
+                                        "text": "Datos origen: LUNG_CANCER" 
+                                    },
+                                    "yAxis": { 
+                                        "title": { 
+                                            "text": "Predicción" 
+                                        } 
+                                    },
+                                    "xAxis": { 
+                                        "categories": [] 
+                                    },
+                                    "legend": { 
+                                        "layout": "vertical", 
+                                        "align": "right", 
+                                        "verticalAlign": "middle" 
+                                    },
+                                    "series": [{
+                                        "name": "Valores reales",
+                                        "data": testData
+                                    }, {
+                                        "name": "Valores Predicción",
+                                        "data": predictionData
+                                    }],
+                                    "responsive": {
+                                        "rules": [{
+                                            "condition": { 
+                                                "maxWidth": 500 
+                                            },
+                                            "chartOptions": {
+                                                "legend": { 
+                                                    "layout": "horizontal", 
+                                                    "align": "center", 
+                                                    "verticalAlign": "bottom" 
+                                                }
+                                            }
+                                        }]
+                                    }
+                                });
+                            }
+                        })();
+                    </script>
+                    <!-- Fin gráfica highcharts-->
+                </aside>
+            </div>
+        </main>
+
+        <footer>
+            Interfaz mejorada
+        </footer>
+    </div>
+</body>
+</html>
